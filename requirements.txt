@@ -1,0 +1,4 @@
+pygame>=2.5.0
+neat-python>=0.92
+python-dotenv>=1.0.0
+psutil>=5.9.0
