@@ -28,6 +28,8 @@ Já está documentado no próprio [.env.example](.env.example). Os mais úteis p
 
 Aqui é onde dá pra brincar com a "biologia" do algoritmo. Os campos mais didáticos:
 
+> 💡 **Infos**: vários desses parâmetros (compat. threshold, elitism, taxas de mutação de pesos e topologia) podem ser sobrescritos via `.env` na **Seção 2 — Config avançada** (`NEAT_*`), sem precisar editar o `.ini`. Veja a tabela no [README](README.md#seção-2--config-avançada-neat). Use o `.ini` quando quiser mudar a topologia inicial / função de ativação / pesos iniciais (campos que ainda não têm override).
+
 ### Tamanho/forma da rede
 
 ```ini
@@ -121,7 +123,7 @@ Hoje a rede recebe 6 entradas. Pra adicionar uma sétima (ex.: distância até o
 
 Pra remover uma entrada: o inverso — tira do `extract()`, remove do `INPUT_LABELS`, decrementa `num_inputs`, apaga checkpoint.
 
-> 💡 **Dica de mentoria**: mostre primeiro a rede aprendendo só com `dist`, `larg`, `alt` (3 entradas). Depois adicione velocidade e veja como acelera o aprendizado. Aula visual sobre **engenharia de features**.
+> 💡 **Dicas**: mostre primeiro a rede aprendendo só com `dist`, `larg`, `alt` (3 entradas). Depois adicione velocidade e veja como acelera o aprendizado. Aula visual sobre **engenharia de features**.
 
 Pra mexer nas saídas é parecido: edite `OUTPUT_LABELS`, ajuste `num_outputs` e mude o decoder em [src/ai/trainer.py](src/ai/trainer.py) (`if out[0] > 0.5: d.jump()` etc.).
 

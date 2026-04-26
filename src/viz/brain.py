@@ -119,8 +119,16 @@ class BrainViz:
         color = OUTPUT_ACTIVE if action in ("PULAR", "ABAIXAR") else DIM
         act_label = self.font_xs.render("AÇÃO ATUAL", True, DIM)
         act_value = self.font_action.render(action, True, color)
-        s.blit(act_label, (config.BRAIN_WINDOW_WIDTH - act_value.get_width() - 16, 6))
-        s.blit(act_value, (config.BRAIN_WINDOW_WIDTH - act_value.get_width() - 16, 22))
+        act_x = config.BRAIN_WINDOW_WIDTH - act_value.get_width() - 16
+        s.blit(act_label, (act_x, 6))
+        s.blit(act_value, (act_x, 22))
+
+        run_id = getattr(tstate, "run_id", "") or "—"
+        run_label = self.font_xs.render("RUN ID", True, DIM)
+        run_value = self.font_action.render(run_id, True, TEXT)
+        run_x = act_x - run_value.get_width() - 32
+        s.blit(run_label, (run_x, 6))
+        s.blit(run_value, (run_x, 22))
 
         meta = self.font.render(
             f"geração {tstate.generation}    nós {n_nodes}    conexões {n_edges}",

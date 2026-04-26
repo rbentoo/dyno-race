@@ -31,17 +31,21 @@ make install      # cria .venv e instala pygame + neat-python + dotenv
 make run          # você joga (ESPAÇO pula, ↓ abaixa)
 make ai           # NEAT do zero — abre 2 janelas (jogo + cérebro)
 make ai-resume    # continua treinando do melhor genoma salvo em checkpoints/
-make results      # gera e abre um relatório HTML com gráficos dos experimentos
+make results      # abre dashboard live que atualiza enquanto o treino roda
 make clean        # remove .venv e checkpoints
 ```
 
-`ESC` fecha qualquer modo.
+`ESC` fecha qualquer modo. No modo IA, o dashboard live dos resultados abre automaticamente no navegador.
 
-No modo IA, cada geração concluída adiciona uma linha em `results/dyno-race.csv`. O comando `make results` gera `results/dyno-race-report.html` com gráficos e tabelas para comparar execuções pelo `run_id`.
+No modo IA, cada geração concluída adiciona uma linha em `results/dyno-race.csv`. O dashboard local lê o CSV a cada 2 minutos para comparar execuções pelo `run_id`; recarregue a página manualmente para ver uma geração recém-finalizada antes do próximo refresh automático. O comando `make results` abre o mesmo dashboard sem iniciar o treino.
+
+O dashboard tem botão 🌙/☀️ no canto superior direito pra alternar entre tema claro e escuro — a escolha fica salva no `localStorage` do navegador, então persiste entre sessões.
 
 ## Configuração via `.env`
 
-Tudo ajustável sem mexer em código (`.env.example` lista os defaults):
+O [`.env.example`](.env.example) é dividido em **duas seções**: a simples e a avançada (hiperparâmetros do NEAT). Tudo ajustável sem mexer em código.
+
+### Seção 1 — Config simples
 
 | Variável | Default | O que faz |
 |---|---|---|
@@ -51,14 +55,30 @@ Tudo ajustável sem mexer em código (`.env.example` lista os defaults):
 | `AUTO_RESTART_DELAY` | 3 | segundos de pausa entre gerações |
 | `GAME_SPEED_INITIAL` | 6 | velocidade inicial do mundo |
 | `GAME_SPEED_MAX` | 20 | velocidade máxima |
-| `WINDOW_WIDTH` / `_HEIGHT` | 900 / 300 | janela do jogo |
-| `BRAIN_WINDOW_WIDTH` / `_HEIGHT` | 800 / 600 | janela do cérebro |
+| `WINDOW_WIDTH` / `_HEIGHT` | 1024 / 768 | janela do jogo |
+| `BRAIN_WINDOW_WIDTH` / `_HEIGHT` | 1024 / 768 | janela do cérebro |
 | `LOG_LEVEL` | INFO | nível de log (`DEBUG`, `INFO`, `WARNING`, `ERROR`) |
 | `STATS_SAMPLE_INTERVAL` | 1.0 | intervalo do painel CPU/RAM na janela do cérebro |
 
-Hiperparâmetros do NEAT (mutação, especiação, etc.) ficam em [`src/neat_config/neat-config.ini`](src/neat_config/neat-config.ini).
+### Seção 2 — Config avançada (NEAT)
 
-Pra **personalizar de verdade** (mudar tamanho da rede, pesos iniciais, taxas de mutação, sentidos da IA, função de fitness) → veja [INSTRUCTIONS.md](INSTRUCTIONS.md).
+Vêm comentadas no `.env.example`. **Descomentar = sobrescreve** o valor de [`src/neat_config/neat-config.ini`](src/neat_config/neat-config.ini) sem precisar editar o arquivo.
+
+| Variável | Default `.ini` | O que faz |
+|---|---|---|
+| `NEAT_COMPATIBILITY_THRESHOLD` | 3.0 | distância máxima pra duas redes serem da mesma espécie |
+| `NEAT_MAX_STAGNATION` | 20 | gerações sem melhora antes de uma espécie morrer |
+| `NEAT_SPECIES_ELITISM` | 2 | espécies "elite" protegidas da extinção |
+| `NEAT_ELITISM` | 2 | melhores genomas que passam intactos pra próxima geração |
+| `NEAT_SURVIVAL_THRESHOLD` | 0.2 | fração que sobrevive pra reproduzir |
+| `NEAT_NODE_ADD_PROB` / `_DELETE_PROB` | 0.2 / 0.2 | prob. de adicionar/remover um nó oculto |
+| `NEAT_CONN_ADD_PROB` / `_DELETE_PROB` | 0.5 / 0.5 | prob. de adicionar/remover uma conexão |
+| `NEAT_WEIGHT_MUTATE_RATE` | 0.8 | prob. de cada peso ser perturbado |
+| `NEAT_WEIGHT_MUTATE_POWER` | 0.5 | magnitude da perturbação dos pesos |
+
+Cada override aplicado aparece no log do treino (`NEAT override aplicado: …`).
+
+Pra **personalizar de verdade** (mudar tamanho da rede, pesos iniciais, sentidos da IA, função de fitness) → veja [INSTRUCTIONS.md](INSTRUCTIONS.md).
 
 ## Estrutura
 

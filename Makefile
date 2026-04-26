@@ -10,7 +10,7 @@ help:
 	@echo "  make run          modo humano (espaço pula, ↓ abaixa)"
 	@echo "  make ai           NEAT do zero (treina nova população)"
 	@echo "  make ai-resume    continua treinando do melhor genoma salvo"
-	@echo "  make results      gera e abre relatório HTML dos experimentos"
+	@echo "  make results      abre dashboard live dos experimentos"
 	@echo "  make clean        remove venv e checkpoints"
 
 install:
@@ -29,7 +29,7 @@ ai-resume:
 	$(PY) -m src.main --mode ai-resume
 
 results:
-	$(PY) -m src.reports.results
+	$(PY) -m src.reports.live
 
 clean:
 	rm -rf $(VENV) checkpoints/*.pkl logs/

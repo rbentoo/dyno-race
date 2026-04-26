@@ -33,6 +33,7 @@ class TrainerState:
         self.last_outputs: tuple = ()
         self.last_action: str = "—"
         self.last_generation_metrics: dict = {}
+        self.run_id: str = ""           # mesmo run_id usado no CSV (pra cruzar com o dashboard)
 
 
 TSTATE = TrainerState()
@@ -301,10 +302,33 @@ def _intermission(surface, brain, tstate):
         clock.tick(30)
 
 
+_INT_NEAT_ATTRS = {"max_stagnation", "species_elitism", "elitism"}
+
+
+def _apply_neat_overrides(neat_config) -> None:
+    for path, value in config.NEAT_OVERRIDES.items():
+        if value is None:
+            continue
+        section_name, attr = path.split(".")
+        section = getattr(neat_config, section_name)
+        coerced = int(value) if attr in _INT_NEAT_ATTRS else float(value)
+        setattr(section, attr, coerced)
+        log.info("NEAT override aplicado: %s.%s=%s", section_name, attr, coerced)
+
+
 def run(resume: bool = False, generations: int = 1000):
     log.info("modo IA NEAT | resume=%s | max_geracoes=%d | pop_size=%d",
              resume, generations, config.POPULATION_SIZE)
     TSTATE.started_at = time.monotonic()
+    live_server = None
+    try:
+        from src.reports import live
+        live_server = live.start_background()
+        log.info("dashboard live iniciado em %s (refresh automático: %ds)",
+                 live_server.url, live.REFRESH_SECONDS)
+    except Exception:
+        log.exception("não foi possível iniciar o dashboard live")
+
     pygame.init()
     pygame.font.init()
     # cria a janela do cérebro ANTES da principal — assim a do jogo é a última
@@ -325,6 +349,7 @@ def run(resume: bool = False, generations: int = 1000):
     )
     neat_config.pop_size = config.POPULATION_SIZE
     log.info("NEAT pop_size efetivo=%d", neat_config.pop_size)
+    _apply_neat_overrides(neat_config)
 
     if resume:
         seed = checkpoint.load_best()
@@ -342,6 +367,7 @@ def run(resume: bool = False, generations: int = 1000):
         pop = neat.Population(neat_config)
 
     experiment_reporter = ExperimentReporter(TSTATE, neat_config, resume)
+    TSTATE.run_id = experiment_reporter.run_id
     pop.add_reporter(neat.StdOutReporter(True))
     pop.add_reporter(neat.StatisticsReporter())
     pop.add_reporter(experiment_reporter)
@@ -356,6 +382,9 @@ def run(resume: bool = False, generations: int = 1000):
         raise
     finally:
         experiment_reporter.close()
+        if live_server is not None:
+            live_server.close()
+            log.info("dashboard live encerrado")
         pygame.quit()
         log.info("modo IA encerrado | última geração=%d | recorde=%.1f | relatório=%s",
                  TSTATE.generation, TSTATE.best_fitness, experiment_reporter.path)
