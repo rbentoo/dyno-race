@@ -1,6 +1,9 @@
 """Loop NEAT: cada genoma vira um Dino; todos correm em paralelo no mesmo mundo."""
-import os
+import csv
+import re
 import time
+from datetime import datetime
+from statistics import mean, stdev
 from typing import Optional
 import neat
 import pygame
@@ -29,9 +32,145 @@ class TrainerState:
         self.last_inputs: tuple = ()
         self.last_outputs: tuple = ()
         self.last_action: str = "—"
+        self.last_generation_metrics: dict = {}
 
 
 TSTATE = TrainerState()
+
+
+class ExperimentReporter(neat.reporting.BaseReporter):
+    """Salva um CSV incremental com uma linha por geração concluída."""
+
+    FIELDNAMES = [
+        "run_id", "generation", "elapsed_seconds", "generation_time_seconds",
+        "population_size", "game_speed_initial", "game_speed_max",
+        "points_per_obstacle", "auto_restart_delay",
+        "resume", "compatibility_threshold", "max_stagnation", "species_elitism",
+        "elitism", "survival_threshold", "node_add_prob", "node_delete_prob",
+        "conn_add_prob", "conn_delete_prob", "weight_mutate_rate", "weight_mutate_power",
+        "best_fitness_generation", "best_fitness_run", "avg_fitness", "stdev_fitness",
+        "best_genome_id", "best_species_id", "best_nodes", "best_connections",
+        "best_enabled_connections", "best_obstacles_passed", "best_km", "best_speed_reached",
+        "species_count", "species_sizes", "max_species_stagnation",
+        "mean_genetic_distance", "genetic_distance_stdev",
+    ]
+
+    def __init__(self, tstate: TrainerState, neat_config, resume: bool):
+        self.tstate = tstate
+        self.neat_config = neat_config
+        self.resume = resume
+        self.run_id = datetime.now().strftime("%Y%m%d-%H%M%S")
+        self.path = config.ROOT / "results" / "dyno-race.csv"
+        self.file = None
+        self.writer = None
+        self.generation = 0
+        self.generation_started_at = time.monotonic()
+        self.row: dict = {}
+        log.info("relatório CSV do experimento será anexado em: %s (run_id=%s)", self.path, self.run_id)
+
+    def _ensure_open(self):
+        if self.file is not None:
+            return
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        self._migrate_schema_if_needed()
+        write_header = not self.path.exists() or self.path.stat().st_size == 0
+        self.file = self.path.open("a", newline="", encoding="utf-8")
+        self.writer = csv.DictWriter(self.file, fieldnames=self.FIELDNAMES)
+        if write_header:
+            self.writer.writeheader()
+
+    def _migrate_schema_if_needed(self):
+        if not self.path.exists() or self.path.stat().st_size == 0:
+            return
+        with self.path.open(newline="", encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            old_fieldnames = reader.fieldnames or []
+            if old_fieldnames == self.FIELDNAMES:
+                return
+            rows = list(reader)
+        with self.path.open("w", newline="", encoding="utf-8") as f:
+            writer = csv.DictWriter(f, fieldnames=self.FIELDNAMES)
+            writer.writeheader()
+            for row in rows:
+                writer.writerow({name: row.get(name, "") for name in self.FIELDNAMES})
+
+    def start_generation(self, generation):
+        self.generation = generation
+        self.generation_started_at = time.monotonic()
+        self.row = {
+            "run_id": self.run_id,
+            "generation": generation + 1,
+            "population_size": config.POPULATION_SIZE,
+            "game_speed_initial": config.GAME_SPEED_INITIAL,
+            "game_speed_max": config.GAME_SPEED_MAX,
+            "points_per_obstacle": config.POINTS_PER_OBSTACLE,
+            "auto_restart_delay": config.AUTO_RESTART_DELAY,
+            "resume": int(self.resume),
+            "compatibility_threshold": self.neat_config.species_set_config.compatibility_threshold,
+            "max_stagnation": self.neat_config.stagnation_config.max_stagnation,
+            "species_elitism": self.neat_config.stagnation_config.species_elitism,
+            "elitism": self.neat_config.reproduction_config.elitism,
+            "survival_threshold": self.neat_config.reproduction_config.survival_threshold,
+            "node_add_prob": self.neat_config.genome_config.node_add_prob,
+            "node_delete_prob": self.neat_config.genome_config.node_delete_prob,
+            "conn_add_prob": self.neat_config.genome_config.conn_add_prob,
+            "conn_delete_prob": self.neat_config.genome_config.conn_delete_prob,
+            "weight_mutate_rate": self.neat_config.genome_config.weight_mutate_rate,
+            "weight_mutate_power": self.neat_config.genome_config.weight_mutate_power,
+        }
+
+    def post_evaluate(self, _config, population, species, best_genome):
+        fitnesses = [g.fitness or 0.0 for g in population.values()]
+        species_id = species.get_species_id(best_genome.key)
+        enabled_connections = sum(1 for c in best_genome.connections.values() if c.enabled)
+        self.row.update({
+            "elapsed_seconds": round(time.monotonic() - self.tstate.started_at, 3),
+            "best_fitness_generation": round(best_genome.fitness or 0.0, 3),
+            "best_fitness_run": round(self.tstate.best_fitness, 3),
+            "avg_fitness": round(mean(fitnesses), 3),
+            "stdev_fitness": round(stdev(fitnesses), 3) if len(fitnesses) > 1 else 0.0,
+            "best_genome_id": best_genome.key,
+            "best_species_id": species_id,
+            "best_nodes": len(best_genome.nodes),
+            "best_connections": len(best_genome.connections),
+            "best_enabled_connections": enabled_connections,
+        })
+        self.row.update(self.tstate.last_generation_metrics)
+
+    def info(self, msg):
+        match = re.search(r"Mean genetic distance ([0-9.]+), standard deviation ([0-9.]+)", msg)
+        if match:
+            self.row["mean_genetic_distance"] = float(match.group(1))
+            self.row["genetic_distance_stdev"] = float(match.group(2))
+
+    def end_generation(self, _config, population, species_set):
+        self._ensure_open()
+        species = species_set.species
+        stagnations = [self.generation - s.last_improved for s in species.values()]
+        self.row.update({
+            "generation_time_seconds": round(time.monotonic() - self.generation_started_at, 3),
+            "species_count": len(species),
+            "species_sizes": ";".join(str(len(s.members)) for _, s in sorted(species.items())),
+            "max_species_stagnation": max(stagnations, default=0),
+        })
+        self.writer.writerow({name: self.row.get(name, "") for name in self.FIELDNAMES})
+        self.file.flush()
+
+    def close(self):
+        if self.file is not None:
+            self.file.close()
+
+
+class IntermissionReporter(neat.reporting.BaseReporter):
+    """Mostra a pausa visual depois que os reporters já salvaram a geração."""
+
+    def __init__(self, surface: pygame.Surface, brain: BrainViz, tstate: TrainerState):
+        self.surface = surface
+        self.brain = brain
+        self.tstate = tstate
+
+    def end_generation(self, _config, _population, _species_set):
+        _intermission(self.surface, self.brain, self.tstate)
 
 
 def _eval_genomes_factory(surface: pygame.Surface, hud: HUD, brain: BrainViz, neat_config):
@@ -115,6 +254,13 @@ def _eval_genomes_factory(surface: pygame.Surface, hud: HUD, brain: BrainViz, ne
                 TSTATE.best_fitness = g.fitness
 
         best = max(ge, key=lambda g: g.fitness)
+        best_idx = ge.index(best)
+        best_dino = state.dinos[best_idx]
+        TSTATE.last_generation_metrics = {
+            "best_obstacles_passed": best_dino.obstacles_passed,
+            "best_km": round(state.world.km, 4),
+            "best_speed_reached": round(state.world.speed, 3),
+        }
         checkpoint.save_best(best)
         log.info(
             "geração %d encerrada | melhor=%.1f | recorde=%.1f | nós=%d | conex=%d",
@@ -122,8 +268,6 @@ def _eval_genomes_factory(surface: pygame.Surface, hud: HUD, brain: BrainViz, ne
             len(best.nodes),
             sum(1 for c in best.connections.values() if c.enabled),
         )
-
-        _intermission(surface, brain, TSTATE)
 
     return eval_genomes
 
@@ -197,8 +341,11 @@ def run(resume: bool = False, generations: int = 1000):
     else:
         pop = neat.Population(neat_config)
 
+    experiment_reporter = ExperimentReporter(TSTATE, neat_config, resume)
     pop.add_reporter(neat.StdOutReporter(True))
     pop.add_reporter(neat.StatisticsReporter())
+    pop.add_reporter(experiment_reporter)
+    pop.add_reporter(IntermissionReporter(surface, brain, TSTATE))
 
     eval_fn = _eval_genomes_factory(surface, hud, brain, neat_config)
     try:
@@ -207,6 +354,8 @@ def run(resume: bool = False, generations: int = 1000):
         log.info("treino interrompido pelo usuário")
         pygame.quit()
         raise
-    pygame.quit()
-    log.info("modo IA encerrado | última geração=%d | recorde=%.1f",
-             TSTATE.generation, TSTATE.best_fitness)
+    finally:
+        experiment_reporter.close()
+        pygame.quit()
+        log.info("modo IA encerrado | última geração=%d | recorde=%.1f | relatório=%s",
+                 TSTATE.generation, TSTATE.best_fitness, experiment_reporter.path)

@@ -31,10 +31,13 @@ make install      # cria .venv e instala pygame + neat-python + dotenv
 make run          # você joga (ESPAÇO pula, ↓ abaixa)
 make ai           # NEAT do zero — abre 2 janelas (jogo + cérebro)
 make ai-resume    # continua treinando do melhor genoma salvo em checkpoints/
+make results      # gera e abre um relatório HTML com gráficos dos experimentos
 make clean        # remove .venv e checkpoints
 ```
 
 `ESC` fecha qualquer modo.
+
+No modo IA, cada geração concluída adiciona uma linha em `results/dyno-race.csv`. O comando `make results` gera `results/dyno-race-report.html` com gráficos e tabelas para comparar execuções pelo `run_id`.
 
 ## Configuração via `.env`
 
