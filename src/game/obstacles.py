@@ -135,7 +135,7 @@ class Spawner:
                 obstacles.append(Bird(x))
             else:
                 obstacles.append(Cactus(x))
-            base_gap = max(40, int(180 - speed * 4))
+            base_gap = max(config.OBSTACLE_MIN_GAP_FRAMES, int(180 - speed * 4))
             self.next_spawn = random.randint(base_gap, base_gap + 90)
 
     def reset(self):

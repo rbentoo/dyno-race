@@ -148,6 +148,14 @@ class BrainViz:
             pygame.draw.circle(s, TEXT, (sw_x, 36), 11, 1)
             s.blit(name, (x, 22))
 
+            sp_id = getattr(tstate, "current_species_id", None)
+            if sp_id is not None:
+                sp_label = self.font_xs.render("ESPÉCIE", True, DIM)
+                sp_value = self.font_action.render(f"#{sp_id}", True, TEXT)
+                sp_x = sw_x + 24
+                s.blit(sp_label, (sp_x, 6))
+                s.blit(sp_value, (sp_x, 22))
+
     # ---------- Column labels ----------
     def _draw_column_labels(self, s, cols, top):
         col_in, col_out, col_hid = cols

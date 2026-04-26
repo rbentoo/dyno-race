@@ -34,6 +34,7 @@ class TrainerState:
         self.last_action: str = "—"
         self.last_generation_metrics: dict = {}
         self.run_id: str = ""           # mesmo run_id usado no CSV (pra cruzar com o dashboard)
+        self.current_species_id: Optional[int] = None
 
 
 TSTATE = TrainerState()
@@ -42,10 +43,15 @@ TSTATE = TrainerState()
 class ExperimentReporter(neat.reporting.BaseReporter):
     """Salva um CSV incremental com uma linha por geração concluída."""
 
+    # Defaults usados pra preencher colunas ausentes ao migrar CSVs antigos.
+    LEGACY_DEFAULTS = {
+        "obstacle_min_gap_frames": "40",
+    }
+
     FIELDNAMES = [
         "run_id", "generation", "elapsed_seconds", "generation_time_seconds",
         "population_size", "game_speed_initial", "game_speed_max",
-        "points_per_obstacle", "auto_restart_delay",
+        "points_per_obstacle", "auto_restart_delay", "obstacle_min_gap_frames",
         "resume", "compatibility_threshold", "max_stagnation", "species_elitism",
         "elitism", "survival_threshold", "node_add_prob", "node_delete_prob",
         "conn_add_prob", "conn_delete_prob", "weight_mutate_rate", "weight_mutate_power",
@@ -93,7 +99,11 @@ class ExperimentReporter(neat.reporting.BaseReporter):
             writer = csv.DictWriter(f, fieldnames=self.FIELDNAMES)
             writer.writeheader()
             for row in rows:
-                writer.writerow({name: row.get(name, "") for name in self.FIELDNAMES})
+                writer.writerow({
+                    name: row.get(name) if row.get(name) not in (None, "")
+                    else self.LEGACY_DEFAULTS.get(name, "")
+                    for name in self.FIELDNAMES
+                })
 
     def start_generation(self, generation):
         self.generation = generation
@@ -106,6 +116,7 @@ class ExperimentReporter(neat.reporting.BaseReporter):
             "game_speed_max": config.GAME_SPEED_MAX,
             "points_per_obstacle": config.POINTS_PER_OBSTACLE,
             "auto_restart_delay": config.AUTO_RESTART_DELAY,
+            "obstacle_min_gap_frames": config.OBSTACLE_MIN_GAP_FRAMES,
             "resume": int(self.resume),
             "compatibility_threshold": self.neat_config.species_set_config.compatibility_threshold,
             "max_stagnation": self.neat_config.stagnation_config.max_stagnation,
@@ -162,6 +173,26 @@ class ExperimentReporter(neat.reporting.BaseReporter):
             self.file.close()
 
 
+class ExtinctionTracker(neat.reporting.BaseReporter):
+    """Acumula IDs das espécies removidas por estagnação e loga a cada geração."""
+
+    def __init__(self):
+        self.extinct_ids: list[int] = []
+        self._pending: list[int] = []
+
+    def species_stagnant(self, sid, _species):
+        self._pending.append(sid)
+
+    def end_generation(self, _config, _population, _species_set):
+        self.extinct_ids.extend(self._pending)
+        ids_str = ", ".join(f"#{sid}" for sid in self.extinct_ids) if self.extinct_ids else "—"
+        suffix = ""
+        if self._pending:
+            suffix = " (esta geração: " + ", ".join(f"#{sid}" for sid in self._pending) + ")"
+        log.info("Population extinctions: %d [%s]%s", len(self.extinct_ids), ids_str, suffix)
+        self._pending = []
+
+
 class IntermissionReporter(neat.reporting.BaseReporter):
     """Mostra a pausa visual depois que os reporters já salvaram a geração."""
 
@@ -174,7 +205,7 @@ class IntermissionReporter(neat.reporting.BaseReporter):
         _intermission(self.surface, self.brain, self.tstate)
 
 
-def _eval_genomes_factory(surface: pygame.Surface, hud: HUD, brain: BrainViz, neat_config):
+def _eval_genomes_factory(surface: pygame.Surface, hud: HUD, brain: BrainViz, neat_config, population):
     def eval_genomes(genomes, _config):
         TSTATE.generation += 1
         log.info("=== geração %d iniciando | %d genomas ===", TSTATE.generation, len(genomes))
@@ -193,9 +224,10 @@ def _eval_genomes_factory(surface: pygame.Surface, hud: HUD, brain: BrainViz, ne
         clock = pygame.time.Clock()
         TSTATE.gen_best = 0.0
 
-        max_frames = 60 * 60 * 2  # 2 min por geração
+        # 0 = sem limite (corre até todos morrerem). Caso contrário, converte segundos em frames.
+        max_frames = config.MAX_GENERATION_SECONDS * config.FPS if config.MAX_GENERATION_SECONDS > 0 else 0
         frame = 0
-        while any(d.alive for d in state.dinos) and frame < max_frames:
+        while any(d.alive for d in state.dinos) and (max_frames == 0 or frame < max_frames):
             frame += 1
             for ev in pygame.event.get():
                 if ev.type == pygame.QUIT:
@@ -229,6 +261,10 @@ def _eval_genomes_factory(surface: pygame.Surface, hud: HUD, brain: BrainViz, ne
                 TSTATE.current_dino = d
                 TSTATE.last_inputs = last_inputs
                 TSTATE.last_outputs = last_outputs
+                try:
+                    TSTATE.current_species_id = population.species.get_species_id(ge[best_idx].key)
+                except (KeyError, AttributeError):
+                    TSTATE.current_species_id = None
                 if last_outputs[0] > 0.5:
                     TSTATE.last_action = "PULAR"
                 elif last_outputs[1] > 0.5:
@@ -371,9 +407,10 @@ def run(resume: bool = False, generations: int = 1000):
     pop.add_reporter(neat.StdOutReporter(True))
     pop.add_reporter(neat.StatisticsReporter())
     pop.add_reporter(experiment_reporter)
+    pop.add_reporter(ExtinctionTracker())
     pop.add_reporter(IntermissionReporter(surface, brain, TSTATE))
 
-    eval_fn = _eval_genomes_factory(surface, hud, brain, neat_config)
+    eval_fn = _eval_genomes_factory(surface, hud, brain, neat_config, pop)
     try:
         pop.run(eval_fn, generations)
     except SystemExit:

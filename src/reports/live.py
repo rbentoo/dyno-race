@@ -350,10 +350,30 @@ _HTML_TEMPLATE = """<!doctype html>
 
     const colors = ['#2f6fed', '#1f9d55', '#dc3a3a', '#8b5cf6', '#d97706', '#0891b2', '#be2a5b', '#4f46e5', '#0f766e', '#be185d'];
     const tooltip = document.getElementById('tooltip');
+    const SELECTION_STORAGE_KEY = 'dyno-selected-runs';
+
+    function loadSelection() {
+      try {
+        const raw = localStorage.getItem(SELECTION_STORAGE_KEY);
+        if (raw === null) return null;
+        const parsed = JSON.parse(raw);
+        return Array.isArray(parsed) ? new Set(parsed) : null;
+      } catch (e) {
+        return null;
+      }
+    }
+
+    function persistSelection(selected) {
+      try {
+        if (selected === null) localStorage.removeItem(SELECTION_STORAGE_KEY);
+        else localStorage.setItem(SELECTION_STORAGE_KEY, JSON.stringify(Array.from(selected)));
+      } catch (e) {}
+    }
+
     const state = {
       payload: { rows: [], summaries: [], config_fields: [] },
       knownRuns: [],
-      selected: null, // null = "all" (default), Set = filtro ativo
+      selected: loadSelection(), // null = "all" (default), Set = filtro ativo
       colorByRun: new Map(),
     };
 
@@ -576,11 +596,13 @@ _HTML_TEMPLATE = """<!doctype html>
       const action = event.target.dataset.filterAction;
       if (action === 'all') {
         state.selected = null;
+        persistSelection(state.selected);
         renderAll();
         return;
       }
       if (action === 'none') {
         state.selected = new Set();
+        persistSelection(state.selected);
         renderAll();
         return;
       }
@@ -599,6 +621,7 @@ _HTML_TEMPLATE = """<!doctype html>
       if (state.selected.size === state.knownRuns.length) {
         state.selected = null;
       }
+      persistSelection(state.selected);
       renderAll();
     });
 
@@ -630,12 +653,16 @@ class LiveHandler(BaseHTTPRequestHandler):
 
     def _send(self, body: str | bytes, content_type: str, status: int = 200):
         payload = body.encode("utf-8") if isinstance(body, str) else body
-        self.send_response(status)
-        self.send_header("Content-Type", content_type)
-        self.send_header("Content-Length", str(len(payload)))
-        self.send_header("Cache-Control", "no-store")
-        self.end_headers()
-        self.wfile.write(payload)
+        try:
+            self.send_response(status)
+            self.send_header("Content-Type", content_type)
+            self.send_header("Content-Length", str(len(payload)))
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            self.wfile.write(payload)
+        except (BrokenPipeError, ConnectionResetError):
+            # cliente desconectou antes do envio terminar — comum em refresh/fechar aba
+            pass
 
     def do_GET(self):
         path = urlparse(self.path).path

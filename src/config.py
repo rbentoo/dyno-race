@@ -26,6 +26,12 @@ WINDOW_HEIGHT = _int("WINDOW_HEIGHT", 768)
 BRAIN_WINDOW_WIDTH = _int("BRAIN_WINDOW_WIDTH", 800)
 BRAIN_WINDOW_HEIGHT = _int("BRAIN_WINDOW_HEIGHT", 720)
 STATS_SAMPLE_INTERVAL = float(os.getenv("STATS_SAMPLE_INTERVAL", "1.0"))
+# Tempo máximo (segundos) que uma geração pode durar. 0 = sem limite (corre até
+# todos os dinos morrerem, mesmo que demore horas).
+MAX_GENERATION_SECONDS = _int("MAX_GENERATION_SECONDS", 0)
+# Frames mínimos entre obstáculos (teto de dificuldade do jogo). Quanto menor,
+# mais apertado fica em alta velocidade. Default 40 = ~0.67s a 60fps.
+OBSTACLE_MIN_GAP_FRAMES = _int("OBSTACLE_MIN_GAP_FRAMES", 40)
 
 # Overrides opcionais do NEAT (vêm do .env > seção avançada).
 # None = mantém o valor de src/neat_config/neat-config.ini.
