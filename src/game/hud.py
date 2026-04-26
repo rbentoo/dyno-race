@@ -101,7 +101,9 @@ class HUD:
 
     def draw_ai(self, surface: pygame.Surface, *, generation: int, alive: int, total: int,
                 best_fitness: float, gen_best: float, km: float,
-                speed: float, speed_max: float):
+                speed: float, speed_max: float, elapsed_seconds: float = 0.0):
+        minutes = int(elapsed_seconds // 60)
+        seconds = int(elapsed_seconds % 60)
         lines = [
             f"GERACAO    {generation}",
             f"VIVOS      {alive:>2}/{total}",
@@ -109,6 +111,7 @@ class HUD:
             f"FIT MAX    {best_fitness:>7.1f}",
             "",
             f"DISTANCIA  {km:>6.2f} KM",
+            f"TEMPO      {minutes:>3}:{seconds:02d}",
             f"VELOCIDADE {speed:>4.1f}/{speed_max:.0f}",
         ]
         self._draw_panel(surface, lines)

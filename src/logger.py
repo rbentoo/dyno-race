@@ -4,8 +4,11 @@ import os
 import sys
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
+from dotenv import load_dotenv
 
 ROOT = Path(__file__).resolve().parent.parent
+load_dotenv(ROOT / ".env")
+
 LOG_DIR = ROOT / "logs"
 LOG_FILE = LOG_DIR / "dyno-race.log"
 

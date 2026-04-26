@@ -44,12 +44,14 @@ Tudo ajustável sem mexer em código (`.env.example` lista os defaults):
 |---|---|---|
 | `POINTS_PER_OBSTACLE` | 10 | pontos por obstáculo ultrapassado |
 | `TROPHY_BASE` | 8 | base dos troféus (8, 16, 32, 64…) |
-| `POPULATION_SIZE` | 50 | tamanho da população NEAT (também ajustar em `src/neat_config/neat-config.ini`) |
+| `POPULATION_SIZE` | 50 | tamanho da população NEAT |
 | `AUTO_RESTART_DELAY` | 3 | segundos de pausa entre gerações |
 | `GAME_SPEED_INITIAL` | 6 | velocidade inicial do mundo |
 | `GAME_SPEED_MAX` | 20 | velocidade máxima |
 | `WINDOW_WIDTH` / `_HEIGHT` | 900 / 300 | janela do jogo |
 | `BRAIN_WINDOW_WIDTH` / `_HEIGHT` | 800 / 600 | janela do cérebro |
+| `LOG_LEVEL` | INFO | nível de log (`DEBUG`, `INFO`, `WARNING`, `ERROR`) |
+| `STATS_SAMPLE_INTERVAL` | 1.0 | intervalo do painel CPU/RAM na janela do cérebro |
 
 Hiperparâmetros do NEAT (mutação, especiação, etc.) ficam em [`src/neat_config/neat-config.ini`](src/neat_config/neat-config.ini).
 

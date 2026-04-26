@@ -82,7 +82,8 @@ def step(state: GameState, on_dino_pass: Optional[Callable] = None):
 
 
 def render(state: GameState, surface: pygame.Surface, hud: HUD, *, mode: str,
-           generation: int = 0, best_fitness: float = 0, gen_best: float = 0):
+           generation: int = 0, best_fitness: float = 0, gen_best: float = 0,
+           elapsed_seconds: float = 0.0):
     state.world.draw(surface)
     for o in state.obstacles:
         o.draw(surface)
@@ -107,6 +108,7 @@ def render(state: GameState, surface: pygame.Surface, hud: HUD, *, mode: str,
             surface, generation=generation, alive=alive, total=len(state.dinos),
             best_fitness=best_fitness, gen_best=gen_best, km=state.world.km,
             speed=state.world.speed, speed_max=config.GAME_SPEED_MAX,
+            elapsed_seconds=elapsed_seconds,
         )
 
 

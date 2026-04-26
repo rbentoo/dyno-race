@@ -18,7 +18,7 @@ Guia prático pra quem clona o repo e quer mexer. Vai do mais fácil (mudar um n
 
 Já está documentado no próprio [.env.example](.env.example). Os mais úteis pra demo:
 
-- `POPULATION_SIZE=50` → quantos dinos correm em paralelo. **Lembre de ajustar `pop_size` em `neat-config.ini` também** (os dois precisam bater).
+- `POPULATION_SIZE=50` → quantos dinos correm em paralelo. O `.env` sobrescreve o `pop_size` do `neat-config.ini`.
 - `AUTO_RESTART_DELAY=3` → tempo da tela "Geração X encerrada". Aumenta pra você comentar ao vivo.
 - `GAME_SPEED_INITIAL` / `GAME_SPEED_MAX` → joga com a dificuldade.
 

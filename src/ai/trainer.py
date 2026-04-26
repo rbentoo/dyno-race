@@ -19,6 +19,7 @@ log = logger.get(__name__)
 class TrainerState:
     """Estado vivo durante uma geração — exposto pra visualização."""
     def __init__(self):
+        self.started_at = time.monotonic()
         self.generation = 0
         self.best_fitness = 0.0
         self.gen_best = 0.0
@@ -101,6 +102,7 @@ def _eval_genomes_factory(surface: pygame.Surface, hud: HUD, brain: BrainViz, ne
                 generation=TSTATE.generation,
                 best_fitness=max(TSTATE.best_fitness, TSTATE.gen_best),
                 gen_best=TSTATE.gen_best,
+                elapsed_seconds=time.monotonic() - TSTATE.started_at,
             )
             pygame.display.flip()
             brain.draw(TSTATE, dino_count=sum(1 for d in state.dinos if d.alive))
@@ -158,6 +160,7 @@ def _intermission(surface, brain, tstate):
 def run(resume: bool = False, generations: int = 1000):
     log.info("modo IA NEAT | resume=%s | max_geracoes=%d | pop_size=%d",
              resume, generations, config.POPULATION_SIZE)
+    TSTATE.started_at = time.monotonic()
     pygame.init()
     pygame.font.init()
     # cria a janela do cérebro ANTES da principal — assim a do jogo é a última
@@ -176,6 +179,8 @@ def run(resume: bool = False, generations: int = 1000):
         neat.DefaultStagnation,
         config.NEAT_CONFIG_PATH,
     )
+    neat_config.pop_size = config.POPULATION_SIZE
+    log.info("NEAT pop_size efetivo=%d", neat_config.pop_size)
 
     if resume:
         seed = checkpoint.load_best()
