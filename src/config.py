@@ -32,6 +32,13 @@ MAX_GENERATION_SECONDS = _int("MAX_GENERATION_SECONDS", 0)
 # Frames mínimos entre obstáculos (teto de dificuldade do jogo). Quanto menor,
 # mais apertado fica em alta velocidade. Default 40 = ~0.67s a 60fps.
 OBSTACLE_MIN_GAP_FRAMES = _int("OBSTACLE_MIN_GAP_FRAMES", 40)
+# Guardrail: encerra a geração se o jogo ficar travado em GAME_SPEED_MAX por
+# este tempo (segundos). Quando saturou, a run não tem mais o que mostrar —
+# salva os dados e segue. 0 = desligado. Default 900 = 15 min.
+MAX_SECONDS_AT_TOP_SPEED = _int("MAX_SECONDS_AT_TOP_SPEED", 900)
+# Limite de gerações por run. 0 = ilimitado (encerra só por fitness_threshold,
+# extinção ou Ctrl+C). Default 1000.
+MAX_GENERATIONS = _int("MAX_GENERATIONS", 1000)
 
 # Overrides opcionais do NEAT (vêm do .env > seção avançada).
 # None = mantém o valor de src/neat_config/neat-config.ini.

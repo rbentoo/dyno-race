@@ -226,6 +226,11 @@ def _eval_genomes_factory(surface: pygame.Surface, hud: HUD, brain: BrainViz, ne
 
         # 0 = sem limite (corre até todos morrerem). Caso contrário, converte segundos em frames.
         max_frames = config.MAX_GENERATION_SECONDS * config.FPS if config.MAX_GENERATION_SECONDS > 0 else 0
+        top_speed_frame_limit = (
+            config.MAX_SECONDS_AT_TOP_SPEED * config.FPS if config.MAX_SECONDS_AT_TOP_SPEED > 0 else 0
+        )
+        top_speed_frames = 0
+        stopped_by_top_speed = False
         frame = 0
         while any(d.alive for d in state.dinos) and (max_frames == 0 or frame < max_frames):
             frame += 1
@@ -284,6 +289,18 @@ def _eval_genomes_factory(surface: pygame.Surface, hud: HUD, brain: BrainViz, ne
             brain.draw(TSTATE, dino_count=sum(1 for d in state.dinos if d.alive))
             clock.tick(config.FPS)
 
+            if top_speed_frame_limit > 0 and state.world.speed >= config.GAME_SPEED_MAX:
+                top_speed_frames += 1
+                if top_speed_frames >= top_speed_frame_limit:
+                    stopped_by_top_speed = True
+                    log.info(
+                        "geração %d encerrada por guardrail: %ds em GAME_SPEED_MAX (%s)",
+                        TSTATE.generation, config.MAX_SECONDS_AT_TOP_SPEED, config.GAME_SPEED_MAX,
+                    )
+                    break
+            else:
+                top_speed_frames = 0
+
         for i, g in enumerate(ge):
             d = state.dinos[i]
             g.fitness = d.fitness + d.obstacles_passed * config.POINTS_PER_OBSTACLE
@@ -297,6 +314,7 @@ def _eval_genomes_factory(surface: pygame.Surface, hud: HUD, brain: BrainViz, ne
             "best_obstacles_passed": best_dino.obstacles_passed,
             "best_km": round(state.world.km, 4),
             "best_speed_reached": round(state.world.speed, 3),
+            "stopped_by_top_speed": stopped_by_top_speed,
         }
         checkpoint.save_best(best)
         log.info(
@@ -352,9 +370,12 @@ def _apply_neat_overrides(neat_config) -> None:
         log.info("NEAT override aplicado: %s.%s=%s", section_name, attr, coerced)
 
 
-def run(resume: bool = False, generations: int = 1000):
-    log.info("modo IA NEAT | resume=%s | max_geracoes=%d | pop_size=%d",
-             resume, generations, config.POPULATION_SIZE)
+def run(resume: bool = False, generations: int | None = None):
+    if generations is None:
+        generations = config.MAX_GENERATIONS if config.MAX_GENERATIONS > 0 else None
+    log.info("modo IA NEAT | resume=%s | max_geracoes=%s | pop_size=%d",
+             resume, generations if generations is not None else "ilimitado",
+             config.POPULATION_SIZE)
     TSTATE.started_at = time.monotonic()
     live_server = None
     try:

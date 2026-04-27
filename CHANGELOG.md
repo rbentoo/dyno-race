@@ -17,12 +17,18 @@ Datas no formato `YYYY-MM-DD`.
 - `STATS_SAMPLE_INTERVAL` no `.env` controla o intervalo de amostragem do painel CPU/RAM da janela do cérebro.
 - Tempo decorrido no HUD durante o treino.
 - Tabela das overrides do NEAT no [README.md](README.md) e atalho documentado no [INSTRUCTIONS.md](INSTRUCTIONS.md).
+- Guardrail `MAX_SECONDS_AT_TOP_SPEED` (default 900s = 15 min, 0 desliga): encerra a geração quando o jogo fica saturado em `GAME_SPEED_MAX` por tempo prolongado, salvando checkpoint normalmente. Métrica `stopped_by_top_speed` exposta em `last_generation_metrics`.
+- `MAX_GENERATIONS` no `.env` (default 1000, 0 = ilimitado) controla o limite de gerações por run em [src/ai/trainer.py](src/ai/trainer.py). Antes era hardcoded em 1000.
 
 ### Alterado
 
 - `.env.example` reorganizado em duas seções: **Simples** (uso diário) e **Avançada** (NEAT). A simples mantém o que já existia.
 - `make results` agora abre o dashboard live em vez de gerar HTML estático.
 - README atualizado com a tabela completa do `.env`, menção ao tema claro/escuro do dashboard e à seção avançada.
+
+### Corrigido
+
+- Pin de `neat-python==0.92` em [requirements.txt](requirements.txt). A versão 2.0.0 introduziu `_adjust_spawn_exact` que dispara `RuntimeError: Internal error adjusting spawn counts` em combinações de `pop_size` × `species_elitism` × nº de espécies vivas (visto em runs com `POPULATION_SIZE=180`). A 0.92 é a versão que o projeto já assumia implicitamente.
 
 ### Removido
 
